@@ -20,6 +20,10 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int findPatternCopyPairs(int*** data, int i) {
     int numPairs = 0;
 
+    /*
+    With that approach (linear division of the problem) the threads aren't balanced thus T(n) > T(n+1)
+    */
+
     int init_z = SIZE_Z*(int)i/MAX_THREAD;
     int max_z = SIZE_Z*(int)(i+1)/MAX_THREAD > SIZE_Z - PATTERN_SIZE ? SIZE_Z - PATTERN_SIZE : SIZE_Z*(int)(i+1)/MAX_THREAD;
     
@@ -41,9 +45,9 @@ int findPatternCopyPairs(int*** data, int i) {
 
                             // Pattern Compare
                             int match = 1;
-                            for(int dz = 0; dz < PATTERN_SIZE && match; ++dz) {
-                                for(int dy = 0; dy < PATTERN_SIZE && match; ++dy) {
-                                    for(int dx = 0; dx < PATTERN_SIZE && match; ++dx) {
+                            for(int dz = 0; dz < PATTERN_SIZE && match; dz++) {
+                                for(int dy = 0; dy < PATTERN_SIZE && match; dy++) {
+                                    for(int dx = 0; dx < PATTERN_SIZE && match; dx++) {
                                         if(data[x + dx][y + dy][z + dz] != data[p_x + dx][p_y + dy][p_z + dz]) {
                                             match = 0;
                                         }

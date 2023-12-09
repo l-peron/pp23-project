@@ -24,9 +24,9 @@ int findPatternCopyPairs(int*** data) {
 
                             // Pattern Compare
                             int match = 1;
-                            for(int dz = 0; dz < PATTERN_SIZE && match; ++dz) {
-                                for(int dy = 0; dy < PATTERN_SIZE && match; ++dy) {
-                                    for(int dx = 0; dx < PATTERN_SIZE && match; ++dx) {
+                            for(int dz = 0; dz < PATTERN_SIZE && match; dz++) {
+                                for(int dy = 0; dy < PATTERN_SIZE && match; dy++) {
+                                    for(int dx = 0; dx < PATTERN_SIZE && match; dx++) {
                                         if(data[x + dx][y + dy][z + dz] != data[p_x + dx][p_y + dy][p_z + dz]) {
                                             match = 0;
                                         }
