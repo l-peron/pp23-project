@@ -108,7 +108,7 @@ unsigned int countPairs(uint64_t* data, unsigned int size) {
         // Since we are not visiting the other pairs (marked as visited), we need to add their values too
         // Every pair would have found the (i_occ - 1) other, so add i_occ * (i_occ - 1)
         if(i_occ > 1) {
-            // printf(" - %d occurences of %" PRIu64 " found, adding %d pairs.\n", i_occ, data[i], i_occ * (i_occ - 1));
+            printf(" - %d occurences of %" PRIu64 " found, adding %d pairs.\n", i_occ, data[i], i_occ * (i_occ - 1));
             count += i_occ * (i_occ  - 1);
         }
     }
@@ -140,9 +140,9 @@ void *thread_thresholding(void *i) {
     printf("* Z Range: [%d, %d[\n", start_z, end_z);
 
     // Thresholding voxels
-    for (int z = start_z; z < start_z; ++z) {
-        for (int y = start_y; y < SIZE_Y; ++y) {
-            for (int x = start_x; x < SIZE_X; ++x) {
+    for (int z = start_z; z < end_z; ++z) {
+        for (int y = start_y; y < end_y; ++y) {
+            for (int x = start_x; x < end_x; ++x) {
                 uint8_t voxel = array[x][y][z];
                 threshold_array[x][y][z] = (voxel > THRESHOLD_LIMIT) ? 1 : 0;
             }
