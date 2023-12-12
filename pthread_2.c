@@ -11,7 +11,7 @@
 #define SIZE_Z 64
 #define THRESHOLD_LIMIT 25
 #define PATTERN_SIZE 4
-#define MAX_THREAD 16
+#define MAX_THREAD 4
 
 pthread_t threads[MAX_THREAD];
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -128,8 +128,8 @@ void *thread_thresholding(void *i) {
     const int start_z = min_born*SIZE_Z;
     const int end_z = max_born*SIZE_Z;
 
-	printf("* Thresholding in section: %d\n", i);
-    printf("* Z Range: [%d, %d[\n", start_z, end_z);
+	printf(" - Thresholding in section: %d\n", thread_index);
+    printf(" - Z Range: [%d, %d[\n", start_z, end_z);
 
     int count = 0;
 
@@ -144,13 +144,11 @@ void *thread_thresholding(void *i) {
         }
     }
 
-    printf("count: %d", count);
-
     // Stop sub-timing
     clock_t end_time = clock();
     double elapsed_time = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
 
-    printf(" - Time taken to threshold section %d: %f seconds\n", i, elapsed_time);
+    printf("  > Time taken to threshold section %d: %f seconds\n", thread_index, elapsed_time);
 	pthread_exit(NULL);
 }
 
@@ -236,8 +234,13 @@ int main() {
 
     printf("* Thresholding the voxels...\n");
 
+    printf("* - Using %d threads\n", MAX_THREAD);
+
     for(int i=0; i< MAX_THREAD; i++) {
         pthread_create(&threads[i], NULL, thread_thresholding, (void *)i);
+    }
+
+    for(int i=0; i< MAX_THREAD; i++) {
         pthread_join(threads[i], NULL);
     }
 
