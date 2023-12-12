@@ -29,8 +29,6 @@ int cmpfunc (const void * a, const void * b) {
  *  And reducing them to 64 bits numbers
  */
 void reduce(uint8_t*** data, uint64_t* reduced_dst) {
-    unsigned int reduced_dst_index = 0;
-
     // Global Iterating
     for(int z = 0; z <= SIZE_Z - PATTERN_SIZE; z += PATTERN_SIZE) {
         for(int y = 0; y <= SIZE_Y - PATTERN_SIZE; y += PATTERN_SIZE) {
