@@ -11,7 +11,7 @@
 #define SIZE_Z 64
 #define THRESHOLD_LIMIT 25
 #define PATTERN_SIZE 4
-#define MAX_THREAD 4
+#define MAX_THREAD 16
 
 pthread_t threads[MAX_THREAD];
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -108,7 +108,7 @@ unsigned int countPairs(uint64_t* data, unsigned int size) {
         // Since we are not visiting the other pairs (marked as visited), we need to add their values too
         // Every pair would have found the (i_occ - 1) other, so add i_occ * (i_occ - 1)
         if(i_occ > 1) {
-            printf(" - %d occurences of %" PRIu64 " found, adding %d pairs.\n", i_occ, data[i], i_occ * (i_occ - 1));
+            //printf(" - %d occurences of %" PRIu64 " found, adding %d pairs.\n", i_occ, data[i], i_occ * (i_occ - 1));
             count += i_occ * (i_occ  - 1);
         }
     }
@@ -128,26 +128,23 @@ void *thread_thresholding(void *i) {
     const int start_z = min_born*SIZE_Z;
     const int end_z = max_born*SIZE_Z;
 
-    const int start_y = min_born*SIZE_Y;
-    const int end_y = max_born*SIZE_Y;
-
-    const int start_x = min_born*SIZE_X;
-    const int end_x = max_born*SIZE_X;
-
 	printf("* Thresholding in section: %d\n", i);
-    printf("* X Range: [%d, %d[\n", start_x, end_x);
-    printf("* Y Range: [%d, %d[\n", start_y, end_y);
     printf("* Z Range: [%d, %d[\n", start_z, end_z);
 
+    int count = 0;
+
     // Thresholding voxels
-    for (int z = start_z; z < end_z; ++z) {
-        for (int y = start_y; y < end_y; ++y) {
-            for (int x = start_x; x < end_x; ++x) {
+    for (int z = start_z; z < end_z; z++) {
+        for (int y = 0; y < SIZE_Y; y++) {
+            for (int x = 0; x < SIZE_X; x++) {
                 uint8_t voxel = array[x][y][z];
                 threshold_array[x][y][z] = (voxel > THRESHOLD_LIMIT) ? 1 : 0;
+                if(voxel > THRESHOLD_LIMIT) count++;
             }
         }
     }
+
+    printf("count: %d", count);
 
     // Stop sub-timing
     clock_t end_time = clock();
