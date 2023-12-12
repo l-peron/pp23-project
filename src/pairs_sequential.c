@@ -38,6 +38,8 @@ void reduce(uint8_t*** data, uint64_t* reduced_dst) {
                 // Reduced cube
                 uint64_t threshold = 0;
                 unsigned int threshold_bit_index = 0;
+                
+                unsigned int index = (z * SIZE_Y * SIZE_X)/(PATTERN_SIZE * PATTERN_SIZE * PATTERN_SIZE) + (y * SIZE_X)/(PATTERN_SIZE * PATTERN_SIZE) + x/PATTERN_SIZE;
 
                 // Inner cube iteration
                 for(int dz = 0; dz < PATTERN_SIZE; dz++) {
@@ -53,7 +55,6 @@ void reduce(uint8_t*** data, uint64_t* reduced_dst) {
                         }
                     }
                 }
-                unsigned int index = (z * SIZE_Y * SIZE_X)/(PATTERN_SIZE * PATTERN_SIZE * PATTERN_SIZE) + (y * SIZE_X)/(PATTERN_SIZE * PATTERN_SIZE) + x/PATTERN_SIZE;
                 
                 reduced_dst[index] = threshold;
             }
