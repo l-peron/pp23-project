@@ -35,28 +35,13 @@ int cmpfunc (const void * a, const void * b) {
  *  Iterate through the array, parsing (4 * 4 * 4) cubes of value of only 0 and 1
  *  And reducing them to 64 bits numbers
  */
-void reduce(uint8_t*** data, uint64_t* reduced_dst, int thread_id) {
-
-    const int thread_index = (int)thread_id;
-
-    const double min_born = (double)thread_index/MAX_THREAD;
-    const double max_born = (double)(thread_index+1)/MAX_THREAD;
-
-    const int start_z = min_born*SIZE_Z;
-    const int end_z = max_born*SIZE_Z;
-
-    const int start_y = min_born*SIZE_Y;
-    const int end_y = max_born*SIZE_Y;
-
-    const int start_x = min_born*SIZE_X;
-    const int end_x = max_born*SIZE_X;
-
-    unsigned int reduced_dst_index = (end_z - start_z)*(end_y - start_y)*(end_x - start_x);
+void reduce(uint8_t*** data, uint64_t* reduced_dst) {
+    unsigned int reduced_dst_index = 0;
 
     // Global Iterating
-    for(int z = start_z; z <= end_z - PATTERN_SIZE; z += PATTERN_SIZE) {
-        for(int y = start_y; y <= end_y - PATTERN_SIZE; y += PATTERN_SIZE) {
-            for(int x = start_x; x <= end_x - PATTERN_SIZE; x += PATTERN_SIZE) {
+    for(int z = 0; z <= SIZE_Z - PATTERN_SIZE; z += PATTERN_SIZE) {
+        for(int y = 0; y <= SIZE_Y - PATTERN_SIZE; y += PATTERN_SIZE) {
+            for(int x = 0; x <= SIZE_X - PATTERN_SIZE; x += PATTERN_SIZE) {
                 // Reduced cube
                 uint64_t threshold = 0;
                 unsigned int threshold_bit_index = 0;
@@ -172,24 +157,6 @@ void *thread_thresholding(void *i) {
 	pthread_exit(NULL);
 }
 
-void *thread_reducing(void *i) {
-    // Start sub-timing
-    clock_t start_time = clock();
-
-    const int thread_index = (int)i;
-
-	printf("* Reducing in section: %d\n", i);
-
-    reduce(array, reduced_array, thread_index);
-
-    // Stop sub-timing
-    clock_t end_time = clock();
-    double elapsed_time = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
-
-    printf(" - Time taken to reduce section %d: %f seconds\n", i, elapsed_time);
-	pthread_exit(NULL);
-}
-
 int main() {
     threshold_array = (uint8_t***) malloc(SIZE_X * sizeof(uint8_t**));
 
@@ -289,10 +256,7 @@ int main() {
         perror("Error creating array");
     }
 
-    for(int i=0; i< MAX_THREAD; i++) {
-        pthread_create(&threads[i], NULL, thread_reducing, (void *)i);
-        pthread_join(threads[i], NULL);
-    }
+    reduce(threshold_array, reduced_array);
 
     printf("* Finished reducing the array !\n");
 
