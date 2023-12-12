@@ -4,6 +4,7 @@
 #include <time.h>
 #include <inttypes.h>
 #include <string.h>
+#include <unistd.h>
 
 #define SIZE_X 1024
 #define SIZE_Y 1024
@@ -52,8 +53,9 @@ void reduce(uint8_t*** data, uint64_t* reduced_dst) {
                         }
                     }
                 }
-
-                reduced_dst[reduced_dst_index++] = threshold;
+                unsigned int index = (z * SIZE_Y * SIZE_X)/(PATTERN_SIZE * PATTERN_SIZE * PATTERN_SIZE) + (y * SIZE_X)/(PATTERN_SIZE * PATTERN_SIZE) + x/PATTERN_SIZE;
+                
+                reduced_dst[index] = threshold;
             }
         }
     }
