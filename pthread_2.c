@@ -4,13 +4,20 @@
 #include <time.h>
 #include <inttypes.h>
 #include <string.h>
-#include <unistd.h>
+#include <pthread.h>
 
 #define SIZE_X 1024
 #define SIZE_Y 1024
 #define SIZE_Z 64
 #define THRESHOLD_LIMIT 25
 #define PATTERN_SIZE 4
+#define MAX_THREAD 16
+
+pthread_t threads[MAX_THREAD];
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+uint8_t*** threshold_array;
+uint64_t* reduced_array;
+uint8_t*** array;
 
 int cmpfunc (const void * a, const void * b) {
     uint64_t a_value = (uint64_t) *((uint64_t *) a);
@@ -21,44 +28,6 @@ int cmpfunc (const void * a, const void * b) {
     else if(a_value < b_value)
         return -1;
     else return 0;
-}
-
-/* 
- * reduce(uint8_t*** data, uint64_t* reduced_dst) -> void :
- *  Iterate through the array, parsing (4 * 4 * 4) cubes of value of only 0 and 1
- *  And reducing them to 64 bits numbers
- */
-void reduce(uint8_t*** data, uint64_t* reduced_dst) {
-    unsigned int reduced_dst_index = 0;
-
-    // Global Iterating
-    for(int z = 0; z <= SIZE_Z - PATTERN_SIZE; z += PATTERN_SIZE) {
-        for(int y = 0; y <= SIZE_Y - PATTERN_SIZE; y += PATTERN_SIZE) {
-            for(int x = 0; x <= SIZE_X - PATTERN_SIZE; x += PATTERN_SIZE) {
-                // Reduced cube
-                uint64_t threshold = 0;
-                unsigned int threshold_bit_index = 0;
-
-                // Inner cube iteration
-                for(int dz = 0; dz < PATTERN_SIZE; dz++) {
-                    for(int dy = 0; dy < PATTERN_SIZE; dy++) {
-                        for(int dx = 0; dx < PATTERN_SIZE; dx++) {
-                            uint8_t value = data[x + dx][y + dy][z + dz];
-
-                            if(value == 1) {
-                                threshold = threshold | 1 << threshold_bit_index;
-                            }
-
-                            threshold_bit_index++;
-                        }
-                    }
-                }
-                unsigned int index = (z * SIZE_Y * SIZE_X)/(PATTERN_SIZE * PATTERN_SIZE * PATTERN_SIZE) + (y * SIZE_X)/(PATTERN_SIZE * PATTERN_SIZE) + x/PATTERN_SIZE;
-                
-                reduced_dst[index] = threshold;
-            }
-        }
-    }
 }
 
 unsigned int countPairs(uint64_t* data, unsigned int size) {
@@ -102,7 +71,7 @@ unsigned int countPairs(uint64_t* data, unsigned int size) {
         // Since we are not visiting the other pairs (marked as visited), we need to add their values too
         // Every pair would have found the (i_occ - 1) other, so add i_occ * (i_occ - 1)
         if(i_occ > 1) {
-            // printf(" - %d occurences of %" PRIu64 " found, adding %d pairs.\n", i_occ, data[i], i_occ * (i_occ - 1));
+            //printf(" - %d occurences of %" PRIu64 " found, adding %d pairs.\n", i_occ, data[i], i_occ * (i_occ - 1));
             count += i_occ * (i_occ  - 1);
         }
     }
@@ -110,10 +79,108 @@ unsigned int countPairs(uint64_t* data, unsigned int size) {
     return count;
 }
 
-int main() {
+/* 
+ * reduce(uint8_t*** data, uint64_t* reduced_dst) -> void :
+ *  Iterate through the array, parsing (4 * 4 * 4) cubes of value of only 0 and 1
+ *  And reducing them to 64 bits numbers
+ */
+void *thread_reduce(void *i) {
+    // Start sub-timing
+    struct timespec start, finish;
+    double elapsed;
 
-    /* Initializing Threshold array */
-    uint8_t*** threshold_array;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    const int thread_index = (int)(uintptr_t)i;
+
+    const double min_born = (double)thread_index/MAX_THREAD;
+    const double max_born = (double)(thread_index+1)/MAX_THREAD;
+
+    const int start_z = min_born*SIZE_Z;
+    const int end_z = max_born*SIZE_Z;
+
+    printf(" - Reducing in section: %d\n", thread_index);
+    printf(" - Z Range: [%d, %d[\n", start_z, end_z);
+
+    // Global Iterating
+    for(int z = start_z; z <= end_z - PATTERN_SIZE; z += PATTERN_SIZE) {
+        for(int y = 0; y <= SIZE_Y - PATTERN_SIZE; y += PATTERN_SIZE) {
+            for(int x = 0; x <= SIZE_X - PATTERN_SIZE; x += PATTERN_SIZE) {
+                // Reduced cube
+                uint64_t threshold = 0;
+                unsigned int threshold_bit_index = 0;
+
+                // Inner cube iteration
+                for(int dz = 0; dz < PATTERN_SIZE; dz++) {
+                    for(int dy = 0; dy < PATTERN_SIZE; dy++) {
+                        for(int dx = 0; dx < PATTERN_SIZE; dx++) {
+                            uint8_t value = threshold_array[x + dx][y + dy][z + dz];
+
+                            if(value == 1) {
+                                threshold = threshold | 1 << threshold_bit_index;
+                            }
+
+                            threshold_bit_index++;
+                        }
+                    }
+                }
+                unsigned int index = (z * SIZE_Y * SIZE_X)/(PATTERN_SIZE * PATTERN_SIZE * PATTERN_SIZE) + (y * SIZE_X)/(PATTERN_SIZE * PATTERN_SIZE) + x/PATTERN_SIZE;
+
+                reduced_array[index] = threshold;
+            }
+        }
+    }
+
+    // Stop sub-timing
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+
+    printf("  > Time taken to reduce section %d: %f seconds\n", thread_index, elapsed);
+	pthread_exit(NULL);
+}
+
+void *thread_thresholding(void *i) {
+    // Start sub-timing
+    struct timespec start, finish;
+    double elapsed;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    const int thread_index = (int)(uintptr_t)i;
+
+    const double min_born = (double)thread_index/MAX_THREAD;
+    const double max_born = (double)(thread_index+1)/MAX_THREAD;
+
+    const int start_z = min_born*SIZE_Z;
+    const int end_z = max_born*SIZE_Z;
+
+	printf(" - Thresholding in section: %d\n", thread_index);
+    printf(" - Z Range: [%d, %d[\n", start_z, end_z);
+
+    int count = 0;
+
+    // Thresholding voxels
+    for (int z = start_z; z < end_z; z++) {
+        for (int y = 0; y < SIZE_Y; y++) {
+            for (int x = 0; x < SIZE_X; x++) {
+                uint8_t voxel = array[x][y][z];
+                threshold_array[x][y][z] = (voxel > THRESHOLD_LIMIT) ? 1 : 0;
+                if(voxel > THRESHOLD_LIMIT) count++;
+            }
+        }
+    }
+
+    // Stop sub-timing
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+
+    printf("  > Time taken to threshold section %d: %f seconds\n", thread_index, elapsed);
+	pthread_exit(NULL);
+}
+
+int main() {
     threshold_array = (uint8_t***) malloc(SIZE_X * sizeof(uint8_t**));
 
     if(threshold_array == NULL) {
@@ -140,7 +207,6 @@ int main() {
 
     /* Initializing Image array */
 
-    uint8_t*** array;
     array = (uint8_t***) malloc(SIZE_X * sizeof(uint8_t**));
 
     if(array == NULL) {
@@ -192,18 +258,21 @@ int main() {
     printf("* Starting computation...\n");
 
     // Start timing
-    clock_t start_time = clock();
+    struct timespec start, finish;
+    double elapsed;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     printf("* Thresholding the voxels...\n");
 
-    // Thresholding voxels
-    for (int z = 0; z < SIZE_Z; ++z) {
-        for (int y = 0; y < SIZE_Y; ++y) {
-            for (int x = 0; x < SIZE_X; ++x) {
-                uint8_t voxel = array[x][y][z];
-                threshold_array[x][y][z] = (voxel > THRESHOLD_LIMIT) ? 1 : 0;
-            }
-        }
+    printf("* - Using %d threads\n", MAX_THREAD);
+
+    for(int i=0; i< MAX_THREAD; i++) {
+        pthread_create(&threads[i], NULL, thread_thresholding, (void *)(uintptr_t)i);
+    }
+
+    for(int i=0; i< MAX_THREAD; i++) {
+        pthread_join(threads[i], NULL);
     }
 
     printf("* Thresholding of voxels finished !\n");
@@ -213,12 +282,20 @@ int main() {
     printf("* Reducing the array...\n");
 
     unsigned int size = (SIZE_X * SIZE_Y * SIZE_Z) / (PATTERN_SIZE * PATTERN_SIZE * PATTERN_SIZE);
-    uint64_t* reduced_array = malloc(sizeof(uint64_t) * size);
+    reduced_array = malloc(sizeof(uint64_t) * size);
     if(reduced_array == NULL) {
         perror("Error creating array");
     }
 
-    reduce(threshold_array, reduced_array);
+    printf("* - Using %d threads\n", MAX_THREAD);
+
+    for(int i=0; i< MAX_THREAD; i++) {
+        pthread_create(&threads[i], NULL, thread_reduce, (void *)(uintptr_t)i);
+    }
+
+    for(int i=0; i< MAX_THREAD; i++) {
+        pthread_join(threads[i], NULL);
+    }
 
     printf("* Finished reducing the array !\n");
 
@@ -237,12 +314,13 @@ int main() {
     printf("* Finished counting pairs !\n");
 
     // Stop timing
-    clock_t end_time = clock();
-    double elapsed_time = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
 
     printf(" - Number of pattern-copy pairs found: %d\n", numPairs);
 
-    printf("> Time taken: %f seconds\n", elapsed_time);
+    printf("> Time taken: %f seconds\n", elapsed);
 
     return 0;
 }
